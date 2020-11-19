@@ -1,3 +1,8 @@
+# This fork of Octopus is maintained by TaxJar
+Notable changes in proxy.rb:
+- We reduced the amount of retries to 1
+- We are searching by the error cause class of `PG::ConnectionBad` rather than the string in the error message
+
 # Important Notice:
 
 Octopus will enter into maintainance mode once Rails 6 is released - since Rails 6 will include all the features for Database Sharding / Replication into Rails Core (PR: https://github.com/rails/rails/pull/34052).
