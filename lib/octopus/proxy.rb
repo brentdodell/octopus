@@ -43,7 +43,7 @@ module Octopus
         if connection_bad(e.message)
           Octopus.logger.error "Octopus.logger.error execute: #{e.message}"
           conn.verify!
-          retry if (retries += 1) < 3
+          retry if (retries += 1) < 2
         else
           raise e
         end
@@ -60,7 +60,7 @@ module Octopus
         if connection_bad(e.message)
           Octopus.logger.error "Octopus.logger.error insert: #{e.message}"
           conn.verify!
-          retry if (retries += 1) < 3
+          retry if (retries += 1) < 2
         else
           raise e
         end
@@ -78,7 +78,7 @@ module Octopus
         if connection_bad(e.message)
           Octopus.logger.error "Octopus.logger.error update: #{e.message}"
           conn.verify!
-          retry if (retries += 1) < 3
+          retry if (retries += 1) < 2
         else
           raise e
         end
@@ -164,7 +164,7 @@ module Octopus
         if connection_bad(e.message)
           Octopus.logger.error "Octopus.logger.error transaction: #{e.message}"
           select_connection.verify!
-          retry if (retries += 1) < 3
+          retry if (retries += 1) < 2
         else
           raise e
         end
@@ -252,7 +252,7 @@ module Octopus
     protected
 
     def connection_bad(error)
-      error.include? "PG::ConnectionBad"
+      error.cause.is_a?(PG::ConnectionBad)
     end
 
     # @thiagopradi - This legacy method missing logic will be keep for a while for compatibility
@@ -284,7 +284,7 @@ module Octopus
         if connection_bad(e.message)
           Octopus.logger.error "Octopus.logger.error legacy_method_missing_logic: #{e.message}"
           select_connection.verify!
-          retry if (retries += 1) < 3
+          retry if (retries += 1) < 2
         else
           raise e
         end
