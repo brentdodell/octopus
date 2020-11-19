@@ -33,60 +33,22 @@ module Octopus
       :release_advisory_lock, :prepare_binds_for_database, :cacheable_query, :column_name_for_operation,
       :prepared_statements, :transaction_state, :create_table, to: :select_connection
 
-    def execute(sql, name = nil)
-      begin
-        retries ||= 0
-        conn = select_connection
-        clean_connection_proxy if should_clean_connection_proxy?('execute')
-        conn.execute(sql, name)
-      rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
-          Octopus.logger.error "Octopus.logger.error execute: #{e.message}"
-          conn.verify!
-          retry if (retries += 1) < 3
-        else
-          raise e
+    %i[execute insert update delete transaction].each do |method|
+      original = instance_method(method)
+      define_method(method) do |*args, &block|
+        begin
+          retries ||= 0
+          original.bind(self).call(*args, &block)
+        rescue ActiveRecord::StatementInvalid => e
+          if connection_bad(e.message)
+            Octopus.logger.error "Octopus.logger.error legacy_method_missing_logic: #{e.message}"
+            select_connection.verify!
+            retry if (retries += 1) < 3
+          else
+            raise e
+          end
         end
       end
-    end
-
-    def insert(arel, name = nil, pk = nil, id_value = nil, sequence_name = nil, binds = [])
-      begin
-        retries ||= 0
-        conn = select_connection
-        clean_connection_proxy if should_clean_connection_proxy?('insert')
-        conn.insert(arel, name, pk, id_value, sequence_name, binds)
-      rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
-          Octopus.logger.error "Octopus.logger.error insert: #{e.message}"
-          conn.verify!
-          retry if (retries += 1) < 3
-        else
-          raise e
-        end
-      end
-    end
-
-    def update(arel, name = nil, binds = [])
-      begin
-        retries ||= 0
-        conn = select_connection
-        # Call the legacy should_clean_connection_proxy? method here, emulating an insert.
-        clean_connection_proxy if should_clean_connection_proxy?('insert')
-        conn.update(arel, name, binds)
-      rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
-          Octopus.logger.error "Octopus.logger.error update: #{e.message}"
-          conn.verify!
-          retry if (retries += 1) < 3
-        else
-          raise e
-        end
-      end
-    end
-
-    def delete(*args, &block)
-      legacy_method_missing_logic('delete', *args, &block)
     end
 
     def select_all(*args, &block)
@@ -148,27 +110,6 @@ module Octopus
       OctopusModel.using(shard).connection.table_exists?(
         ActiveRecord::Migrator.schema_migrations_table_name,
       ) || OctopusModel.using(shard).connection.initialize_schema_migrations_table
-    end
-
-    def transaction(options = {}, &block)
-      begin
-        retries ||= 0
-        if !sharded && current_model_replicated?
-          run_queries_on_shard(Octopus.master_shard) do
-            select_connection.transaction(options, &block)
-          end
-        else
-          select_connection.transaction(options, &block)
-        end
-      rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
-          Octopus.logger.error "Octopus.logger.error transaction: #{e.message}"
-          select_connection.verify!
-          retry if (retries += 1) < 3
-        else
-          raise e
-        end
-      end
     end
 
     def method_missing(method, *args, &block)
@@ -252,7 +193,7 @@ module Octopus
     protected
 
     def connection_bad(error)
-      error.include? "PG::ConnectionBad"
+      error.cause.is_a?(PG::ConnectionBad)
     end
 
     # @thiagopradi - This legacy method missing logic will be keep for a while for compatibility
@@ -284,7 +225,7 @@ module Octopus
         if connection_bad(e.message)
           Octopus.logger.error "Octopus.logger.error legacy_method_missing_logic: #{e.message}"
           select_connection.verify!
-          retry if (retries += 1) < 3
+          retry if (retries += 1) < 2
         else
           raise e
         end
