@@ -40,7 +40,7 @@ module Octopus
         clean_connection_proxy if should_clean_connection_proxy?('execute')
         conn.execute(sql, name)
       rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
+        if connection_bad(e)
           Octopus.logger.error "Octopus.logger.error execute: #{e.message}"
           conn.verify!
           retry if (retries += 1) < 2
@@ -57,7 +57,7 @@ module Octopus
         clean_connection_proxy if should_clean_connection_proxy?('insert')
         conn.insert(arel, name, pk, id_value, sequence_name, binds)
       rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
+        if connection_bad(e)
           Octopus.logger.error "Octopus.logger.error insert: #{e.message}"
           conn.verify!
           retry if (retries += 1) < 2
@@ -75,7 +75,7 @@ module Octopus
         clean_connection_proxy if should_clean_connection_proxy?('insert')
         conn.update(arel, name, binds)
       rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
+        if connection_bad(e)
           Octopus.logger.error "Octopus.logger.error update: #{e.message}"
           conn.verify!
           retry if (retries += 1) < 2
@@ -161,7 +161,7 @@ module Octopus
           select_connection.transaction(options, &block)
         end
       rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
+        if connection_bad(e)
           Octopus.logger.error "Octopus.logger.error transaction: #{e.message}"
           select_connection.verify!
           retry if (retries += 1) < 2
@@ -281,7 +281,7 @@ module Octopus
           val
         end
       rescue ActiveRecord::StatementInvalid => e
-        if connection_bad(e.message)
+        if connection_bad(e)
           Octopus.logger.error "Octopus.logger.error legacy_method_missing_logic: #{e.message}"
           select_connection.verify!
           retry if (retries += 1) < 2
